@@ -18,6 +18,7 @@ use app\models\queries\UserQuery;
  * @property string $password_reset_token
  * @property string $email_confirmation_token
  * @property string $email
+ * @property string $avatar
  * @property string $auth_key
  * @property integer $role
  * @property integer $status
@@ -27,19 +28,44 @@ use app\models\queries\UserQuery;
  */
 class User extends ActiveRecord implements IdentityInterface
 {
-    const STATUS_DELETED = 0;
-    const STATUS_ACTIVE = 10;
 
-    const ROLE_USER = 10;
+    // 邮件未激活
+    const MAIL_INACTIVE = 0;
+
+    // 邮件激活
+    const MAIL_ACTIVE = 1;
+
     /**
-     * 管理员
+     * status状态表
+     *
+     * developer：注册 1 =》 激活 1
+     * admin：注册 1 =》 激活 1 =》 其它admin认证 2
      */
-    const ROLE_ADMIN = 1;
+
+    // 冻结
+    const STATUS_INVALID  = 0;
+
+    // 注册后默认状态（激活后即可用）或 其它admin认证前的状态
+    const STATUS_ACTIVE = 1;
+
+    // 管理员审核通过
+    const STATUS_ADMIN_ACTIVE   = 2;
 
     /**
      * 开发者
      */
-    const ROLE_DEV   = 2;
+    const ROLE_DEV   = 1;
+
+    /**
+     * 管理员
+     */
+    const ROLE_ADMIN = 2;
+
+    /**
+     * 头像目录
+     */
+    const AVATAR_ROOT = '/dist/avatars/';
+
     /**
      * @var string|null the current password value from form input
      */
@@ -85,26 +111,27 @@ class User extends ActiveRecord implements IdentityInterface
             [['username','email','password','role'], 'required', 'on'=>'signup'],
 
             ['status', 'default', 'value' => self::STATUS_ACTIVE],
-            ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_DELETED]],
+            ['status', 'in', 'range' => [self::STATUS_ADMIN_ACTIVE, self::STATUS_ACTIVE, self::STATUS_INVALID]],
 
             ['role', 'default', 'value' => self::ROLE_DEV],
-            ['role', 'in', 'range' => [self::ROLE_USER, self::ROLE_DEV, self::ROLE_ADMIN]],
+            ['role', 'in', 'range' => [self::ROLE_DEV, self::ROLE_ADMIN]],
 
             ['username', 'filter', 'filter' => 'trim'],
             ['username', 'unique'],
             ['username', 'string', 'min' => 2, 'max' => 255],
-
-            ['email', 'filter', 'filter' => 'trim'],
-            ['email', 'validateEmail'],
-            ['email', 'email'],
-            ['email', 'unique'],
+            [['avatar', 'realname'], 'string'],
+            [['email', 'avatar'], 'filter', 'filter' => 'trim'],
+            ['email', 'validateEmail', 'on'=>'signup'],
+            ['email', 'email', 'on'=>'signup'],
+            ['email', 'unique', 'on'=>'signup'],
         ];
     }
 
     public function validateEmail($attribute, $params) {
-        $mailSuffix = \Yii::$app->params['mail-suffix'];
-        if (!preg_match("/.*@{$mailSuffix}$/", $this->$attribute)) {
-            $this->addError($attribute, "我猜你丫是外星人，没有{$mailSuffix}邮箱不可注册：）");
+        // 支持多邮箱绑定
+        $mailSuffix = join('|@', \Yii::$app->params['mail-suffix']);
+        if (!preg_match("/.*(@{$mailSuffix})$/", $this->$attribute)) {
+            $this->addError($attribute, "没有" . join('，', \Yii::$app->params['mail-suffix']) . "邮箱不可注册：）");
         }
     }
     /**
@@ -127,10 +154,16 @@ class User extends ActiveRecord implements IdentityInterface
         if ($this->isNewRecord) {
             $this->generateAuthKey();
             $this->generateEmailConfirmationToken();
+            // 名字与邮箱
+            if (!$this->realname) {
+                $this->realname = $this->username;
+            }
+            // 本地注册需要把 username = email
+            $userDriver = isset(\Yii::$app->params['user_driver']) == true && empty(\Yii::$app->params['user_driver']) == false ? \Yii::$app->params['user_driver'] : 'local';
+            if ($userDriver == 'local') {
+                $this->username = $this->email;
+            }
         }
-        $this->realname = $this->username;
-        $this->username = $this->email;
-
         return parent::beforeSave($insert);
     }
 
@@ -140,6 +173,16 @@ class User extends ActiveRecord implements IdentityInterface
     public static function findIdentity($id)
     {
         return static::findOne($id);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function findByUsername($username)
+    {
+        return static::findOne([
+                'username' => $username
+            ]);
     }
 
     /**
@@ -263,5 +306,14 @@ class User extends ActiveRecord implements IdentityInterface
         if ($save) {
             return $this->save();
         }
+    }
+
+    /**
+     * @return array|\yii\db\ActiveRecord[]
+     */
+    public static function getInactiveAdminList() {
+        return static::find()
+            ->where(['is_email_verified' => static::MAIL_ACTIVE, 'role' => static::ROLE_ADMIN, 'status' => static::STATUS_ACTIVE])
+            ->asArray()->all();
     }
 }

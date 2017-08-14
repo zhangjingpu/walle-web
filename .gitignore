@@ -1,2 +1,4 @@
 /vendor
-submit.sh
+/config/local.php
+tests/_output/*
+.idea/

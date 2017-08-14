@@ -3,7 +3,7 @@
 namespace app\models;
 
 use Yii;
-use walle\command\Command;
+use app\components\Command;
 
 /**
  * This is the model class for table "record".
@@ -23,29 +23,32 @@ class Record extends \yii\db\ActiveRecord
     /**
      * 服务器权限检查
      */
-    const ACTION_PERMSSION = 1;
+    const ACTION_PERMSSION = 24;
+
+    /**
+     * 部署前置触发任务
+     */
+    const ACTION_PRE_DEPLOY = 40;
 
     /**
      * 本地代码更新
      */
-    const ACTION_CLONE = 2;
+    const ACTION_CLONE = 53;
+
+    /**
+     * 部署后置触发任务
+     */
+    const ACTION_POST_DEPLOY = 64;
 
     /**
      * 同步代码到服务器
      */
-    const ACTION_SYNC  = 3;
+    const ACTION_SYNC  = 78;
 
     /**
-     * 软链接
+     * 更新完所有目标机器时触发任务，最后一个得是100
      */
-    const ACTION_LINK  = 4;
-
-    public static $ACTION_PERCENT = [
-        self::ACTION_PERMSSION => '25',
-        self::ACTION_CLONE => '50',
-        self::ACTION_SYNC => '75',
-        self::ACTION_LINK => '100',
-    ];
+    const ACTION_UPDATE_REMOTE = 100;
 
     /**
      * @inheritdoc
@@ -96,16 +99,15 @@ class Record extends \yii\db\ActiveRecord
     public static function saveRecord(Command $commandObj, $task_id, $action, $duration) {
         $record = new static();
         $record->attributes = [
-            'user_id' => \Yii::$app->user->id,
-            'task_id' => $task_id,
-            'status' => (int)$commandObj->getExeStatus(),
-            'action' => $action,
+            'user_id'    => \Yii::$app->user->id,
+            'task_id'    => $task_id,
+            'status'     => (int)$commandObj->getExeStatus(),
+            'action'     => $action,
             'created_at' => time(),
-            'command'=> var_export($commandObj->getExeCommand(), true),
-            'memo'   => var_export($commandObj->getExeLog(), true),
-            'duration' => $duration,
+            'command'    => var_export($commandObj->getExeCommand(), true),
+            'memo'       => substr(var_export($commandObj->getExeLog(), true), 0, 65530),
+            'duration'   => $duration,
         ];
-//        file_put_contents('/tmp/xx', var_export($record->attributes, true).PHP_EOL.PHP_EOL, 8);
         return $record->save();
     }
 }

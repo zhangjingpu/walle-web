@@ -23,7 +23,7 @@ class PasswordResetRequestForm extends Model
             ['email', 'email'],
             ['email', 'exist',
                 'targetClass' => '\app\models\User',
-                'filter' => ['status' => User::STATUS_ACTIVE],
+//                'filter' => ['status' => User::STATUS_ACTIVE],
                 'message' => 'There is no user with such email.'
             ],
         ];
@@ -37,14 +37,14 @@ class PasswordResetRequestForm extends Model
     public function sendEmail()
     {
         /** @var User $user */
-        $user = User::find()->canLogin()->email($this->email)->one();
+        // 无须一定要激活才能取回密码 ->canLogin()
+        $user = User::find()->email($this->email)->one();
 
         if ($user) {
             $user->generatePasswordResetToken();
             if ($user->save()) {
-                $params = Yii::$app->params;
                 return Yii::$app->mail->compose('passwordResetToken', ['user' => $user])
-                    ->setFrom([$params['support.email'] => $params['support.name']])
+                    ->setFrom(Yii::$app->mail->messageConfig['from'])
                     ->setTo($this->email)
                     ->setSubject('Password reset for ' . Yii::$app->name)
                     ->send();

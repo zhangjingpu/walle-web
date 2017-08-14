@@ -1,69 +1,164 @@
-Walle 瓦力 web部署系统
-==========================
+![](https://raw.github.com/meolu/walle-web/master/docs/logo.jpg)
 
-功能
----
+Walle - A Deployment Tool
+=========================
+[![Build Status](https://travis-ci.org/meolu/walle-web.svg?branch=master)](https://travis-ci.org/meolu/walle-web)
+[![Packagist](https://img.shields.io/packagist/v/meolu/walle-web.svg)](https://packagist.org/packages/meolu/walle-web)
+[![Yii2](https://img.shields.io/badge/Powered_by-Yii_Framework-green.svg?style=flat)](http://www.yiiframework.com/)
 
-Walle景愿是做一个web部署系统工具，[官网主页](http://www.huamanshu.com/walle.html)了解更多。
+A web deployment tool, Easy for configuration, Fully functional, Smooth interface, Out of the box.
+support git/svn Version control system, no matter what language you are, php/java/ruby/python, just as jenkins. you can deploy the code or output to multiple servers easily by walle.
 
-* 用户分身份注册、登录
-* 开发者发起上线任务申请
-* 管理者审核上线任务
-* 支持多项目部署
-* 开发者一键部署上线
-* 快速回滚
-* 查看上线日志
-* 线上文件指纹确认
+[Home Page](https://www.walle-web.io) | [官方主页](https://www.walle-web.io) | [中文说明](https://github.com/meolu/walle-web/blob/master/docs/README-zh.md) | [文档手册](https://www.walle-web.io/docs/).
 
-依赖
----
+Now, there are more than hundreds of companies hosted walle for deployment, star walle if you like : )
 
-* git
-* web ui的运行环境php、nginx（apache）、mysql
-* composer，安装walle、yii2
-* ssh
+* Support git/svn Version control system.
+* User signup by admin/develop identity.
+* Developer submit a task, deploy task.
+* Admin audit task.
+* Multiple project.
+* Multiple Task Parallel.
+* Quick rollback.
+* Group relation of project.
+* Task of pre-deploy（e.g: test ENV var）.
+* Task of post-deploy（e.g: mvn/ant, composer install for vendor）.
+* Task of pre-release（e.g: stop service）.
+* Task of post-release（e.g: restart service）.
+* Check up file md5.
+* Multi-process multi-server file transfer (Ansible).
 
-安装
-----
+
+Requirements
+------------
+
+* Bash(git、ssh)
+* LNMP/LAMP(php5.4+)
+* Composer
+* Ansible(Optional)
+
+That's all. It's base package of PHP environment!
+
+
+Installation
+------------
 ```
 git clone git@github.com:meolu/walle-web.git
 cd walle-web
-vi config/web.php # 设置mysql连接
-composer install
-./yii migrate/up  # 导入数据库
+vi config/web.php # set up module db mysql connection info
+composer install  # error cause by bower-asset, install：composer global require "fxp/composer-asset-plugin:*"
+./yii walle/setup # init walle
 ```
+Or [The Most Detailed Installation Guide](https://github.com/meolu/walle-web/blob/master/docs/install-en.md), any questions refer to [FAQ](https://github.com/meolu/walle-web/blob/master/docs/faq-en.md)
 
-快速开始
--------
-* 首先[配置一个项目](https://github.com/meolu/walle-web/blob/master/yml-config.md)
-* 提交上线任务
-* 发起上线
+Quick Start
+-------------
+
+* Signup a admin user(`admin/admin` exists), then configure a project, add member to the project, detect it.
+    * [git demo](https://github.com/meolu/walle-web/blob/master/docs/config-git-en.md)
+    * [svn demo](https://github.com/meolu/walle-web/blob/master/docs/config-svn-en.md)
+* Signup a develop user(`demo/demo` exists), submit a deployment.
+* Project admin audit the deployment.
+* Developer deploy the deployment.
+
+
+Custom
+--------
+you would like to adjust some params to make walle suited for your company.
+
+* Set suffix of email while signing in
+    ```php
+    vi config/params.php
+
+    'mail-suffix'   => [  // specify the suffix of email, multiple suffixes are allow.
+        'huamanshu.com',  // e.g: allow xyz@huamanshu.com only
+    ]
+    ```
+
+* Configure email smtp
+    ```php
+    vi config/local.php
+
+    'transport' => [
+            'host'       => 'smtp.huamanshu.com',
+            'username'   => 'service@huamanshu.com',
+            'password'   => 'K84erUuxg1bHqrfD',
+            'port'       => 25,
+            'encryption' => 'tls',
+        ],
+        'messageConfig' => [
+            'charset' => 'UTF-8',
+            'from'    => ['service@huamanshu.com' => '花满树出品'],  // the same with username of mail module in config/web.php
+        ],
+    ```
+
+* Configure the path for log
+    ```php
+    vi config/params.php
+
+    'log.dir'   => '/tmp/walle/',
+    ```
+
+* Configure language
+    ```php
+    vi config/web.php +73
+
+    'language'   => 'en',  # zh => 中文,  en => English
+    ```
 
 
 To Do List
 ----------
 
-* 部署出错详细信息优化
-* 项目配置模块拆分
-* 测试环境支持分支选择
+- Travis CI integration
+- Mail events：specify kinds of events
+- Gray released：specify servers
+- Websocket instead of poll
+- A manager of static source
+- Configure variables
+- Support Docker
+- Open api
+- Command line
 
-截图
----
-#### 注册发普通开发者和管理角色
-![](https://raw.github.com/meolu/walle-web/master/screenshots/login.png)
+Update
+-----------------
+```
+./yii walle/upgrade    # upgrade walle
+```
 
-#### 提交上线任务
-![](https://raw.github.com/meolu/walle-web/master/screenshots/walle.gif)
 
-#### 上线列表
-![](https://raw.github.com/meolu/walle-web/master/screenshots/task-list.png)
+Architecture
+------------
+#### git/svn, user, host, servers
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-flow-relation-en.png)
 
-#### 发起上线
-![](https://raw.github.com/meolu/walle-web/master/screenshots/deploy.png)
+#### deployment flow
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-flow-en.png)
+
+Screenshots
+-----------
+
+#### project config
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-config-edit-en.jpg)
+
+#### sumbit a task
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-submit-en.jpg)
+
+#### list of task
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-dev-list-en.jpg)
+
+#### demo show
+![](https://raw.github.com/meolu/docs/master/walle-web.io/docs/en/static/walle-en.gif)
 
 ## CHANGELOG
-瓦力的版本记录：[CHANGELOG](https://github.com/meolu/walle-web/blob/master/CHANGELOG.md)
+[CHANGELOG](https://github.com/meolu/walle-web/releases)
 
 
-## 有问题加群
-**QQ：482939318**
+Discussing
+----------
+- [submit issue](https://github.com/meolu/walle-web/issues/new)
+- email: wushuiyong@huamanshu.com
+
+勾搭下
+--------
+<img src="https://raw.githubusercontent.com/meolu/walle-web/feature-weixin/docs/weixin.wushuiyong.jpg" width="244" height="314" alt="吴水永微信" align=left />

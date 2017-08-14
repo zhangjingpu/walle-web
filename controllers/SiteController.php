@@ -4,10 +4,9 @@ namespace app\controllers;
 
 use Yii;
 use app\components\Controller;
-use yii\filters\AccessControl;
-use yii\filters\VerbFilter;
 use app\models\User;
 use app\models\forms\LoginForm;
+use app\models\forms\LdapLoginForm;
 use app\models\forms\PasswordResetRequestForm;
 use app\models\forms\ResetPasswordForm;
 use yii\web\HttpException;
@@ -36,13 +35,44 @@ class SiteController extends Controller
             return $this->goHome();
         }
 
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
-        } else {
-            return $this->render('login', [
-                'model' => $model,
-            ]);
+        $userDriver = isset(\Yii::$app->params['user_driver']) == true && empty(\Yii::$app->params['user_driver']) == false ? strtolower(\Yii::$app->params['user_driver']) : 'local';
+
+        if($userDriver == 'ldap'){
+            if(isset(\Yii::$app->params['ldap']) == false){
+                throw new \Exception(yii::t('walle', 'the login dirver configs does not defined', array(
+                        'loginType' => \Yii::$app->params['user_driver']
+                    )));
+            }
+
+            if(is_array(\Yii::$app->params['ldap']) == false){
+                throw new \Exception(yii::t('walle', 'the login dirver configs parse error', array(
+                        'loginType' => \Yii::$app->params['user_driver']
+                    )));
+            }
+
+            $model = new LdapLoginForm(\Yii::$app->params['ldap']);
+            if ($model->load(Yii::$app->request->post()) && $model->login()) {
+                return $this->goBack();
+            } else {
+                return $this->render('login', [
+                    'isLdapLigin' => true,
+                    'model' => $model,
+                ]);
+            }
+        }elseif($userDriver == 'local'){
+            $model = new LoginForm();
+            if ($model->load(Yii::$app->request->post()) && $model->login()) {
+                return $this->goBack();
+            } else {
+                return $this->render('login', [
+                    'isLdapLigin' => false,
+                    'model' => $model,
+                ]);
+            }
+        }else{
+            throw new \Exception(yii::t('walle', 'login type could not support', array(
+                    'loginType' => \Yii::$app->params['user_driver']
+                )));
         }
     }
 
@@ -60,14 +90,21 @@ class SiteController extends Controller
      * User signup
      */
     public function actionSignup() {
+        $userDriver = isset(\Yii::$app->params['user_driver']) == true && empty(\Yii::$app->params['user_driver']) == false ? \Yii::$app->params['user_driver'] : 'local';
+        if ($userDriver != 'local') {
+            throw new BadRequestHttpException(Yii::t('walle', 'the login type does not provide registration', array(
+                    'loginType'=>$userDriver
+                )));
+        }
+
         $user = new User(['scenario' => 'signup']);
         if ($user->load(Yii::$app->request->post())) {
+            $user->status = User::STATUS_ACTIVE;
             if ($user->save()) {
-                $params = Yii::$app->params;
                 Yii::$app->mail->compose('confirmEmail', ['user' => $user])
-                    ->setFrom([$params['support.email'] => $params['support.name']])
+                    ->setFrom(Yii::$app->mail->messageConfig['from'])
                     ->setTo($user->email)
-                    ->setSubject('Complete registration with ' . Yii::$app->name)
+                    ->setSubject('瓦力平台 - ' . $user->realname)
                     ->send();
                 Yii::$app->session->setFlash('user-signed-up');
                 return $this->refresh();
@@ -102,11 +139,17 @@ class SiteController extends Controller
      */
     public function actionRequestPasswordReset()
     {
+        $userDriver = isset(\Yii::$app->params['user_driver']) == true && empty(\Yii::$app->params['user_driver']) == false ? \Yii::$app->params['user_driver'] : 'local';
+        if ($userDriver != 'local') {
+            throw new BadRequestHttpException(Yii::t('walle', 'the login type does not provide security', array(
+                    'loginType'=>$userDriver
+                )));
+        }
+
         $model = new PasswordResetRequestForm();
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             if ($model->sendEmail()) {
                 Yii::$app->getSession()->setFlash('success', 'Check your email for further instructions.');
-
                 return $this->goHome();
             } else {
                 Yii::$app->getSession()->setFlash('error', 'Sorry, we are unable to reset password for email provided.');
@@ -123,6 +166,13 @@ class SiteController extends Controller
      */
     public function actionResetPassword($token)
     {
+        $userDriver = isset(\Yii::$app->params['user_driver']) == true && empty(\Yii::$app->params['user_driver']) == false ? \Yii::$app->params['user_driver'] : 'local';
+        if ($userDriver != 'local') {
+            throw new BadRequestHttpException(Yii::t('walle', 'the login type does not provide security', array(
+                    'loginType'=>$userDriver
+                )));
+        }
+
         try {
             $model = new ResetPasswordForm($token);
         } catch (InvalidParamException $e) {
@@ -171,7 +221,7 @@ class SiteController extends Controller
         }
 
         if (Yii::$app->getRequest()->getIsAjax()) {
-            static::renderJson([], $code, $message);
+            static::renderJson([], $code ?: -1, $message);
         } else {
             return $this->render('error', [
                 'name' => $name,

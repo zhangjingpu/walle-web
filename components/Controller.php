@@ -14,6 +14,30 @@ use yii;
 class Controller extends yii\web\Controller {
 
     /**
+     * 返回成功
+     */
+    const SUCCESS = 0;
+
+    /**
+     * 返回失败
+     */
+    const FAIL    = -1;
+
+    public $uid = null;
+
+    /**
+     * @param \yii\base\Action $action
+     * @return bool
+     */
+    public function beforeAction($action) {
+        parent::beforeAction($action);
+        if (Yii::$app->user->id) {
+            $this->uid = Yii::$app->user->id;
+        }
+        return true;
+    }
+
+    /**
      * json渲染. PS:调用此方法之前若有输出将会出错
      *
      * @param mixed     $data
@@ -21,15 +45,14 @@ class Controller extends yii\web\Controller {
      * @param string    $msg  错误信息
      * @param int       $option json_encode options
      */
-    public static function renderJson($data, $code = 0, $msg = '', $option = 0) {
+    public static function renderJson($data, $code = self::SUCCESS, $msg = '', $option = 0) {
         Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
-        $ret = [
+
+        Yii::$app->response->data = [
             'code' => (int)$code,
             'msg'  => $msg,
             'data' => $data,
-        ];
-
-        Yii::$app->response->data = $ret;
+        ];;
         Yii::$app->end();
     }
 
@@ -44,6 +67,17 @@ class Controller extends yii\web\Controller {
         $post = Yii::$app->request->post($name);
         $get  = Yii::$app->request->get($name);
         return isset($_POST[$name]) ? $post : (isset($_GET[$name]) ? $get : $default);
+    }
+
+    /**
+     * 需要项目管理员权限
+     *
+     * @throws \Exception
+     */
+    protected function validateAdmin() {
+        if (!GlobalHelper::isValidAdmin()) {
+            throw new \Exception(\yii::t('walle', 'you are not the manager'));
+        }
     }
 }
 
